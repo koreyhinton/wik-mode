@@ -22,17 +22,6 @@ M-S-f (wik-find-file)
 M-S-o (wik-outline-entry-toggle)
     Toggles visibility for the current heading's content.
 
-M-S-LEFT (wik-move-to-file)
-    Moves content out of the current WIK file and into a prompted file name
-    and leaves behind a reference to the file name or path that is entered
-    into the prompt. To send blank/empty content to the file, do not mark a
-    region before running the command.
-
-M-S-RIGHT (wik-move-from-file)
-    Moves content out of the file name at point. The file name text will be
-    replaced with the actual file content and the before-referenced file is
-    deleted.
-
 M-S-UP (wik-close-file)
     Closes a wik file and when there are multiple windows will also close
     the window. Despite that WIK can open non-WIK files, this keybinding will
@@ -115,38 +104,7 @@ heading hierarchy for each setion
 
 ORG-MODE COMPARISON * TABLES
 
-Wik mode does not have a built-in table editor. (Side note: Originally wik mode
-was going to be built on top of org-mode to make use of org-mode's table editor,
-but unfortunately org-mode was too tied to the concept of having headlines
-start with an *, so instead I built it on top of outline-mode and while
-org-mode derives from outline-mode, outline mode does not have the editor)
-
-An org-mode table can still be brought into wik mode as unformatted text
-by taking a few keyboard shortcuts to get a temporary org-mode file created
-and then content moved back* to the Wik file (*content moved back to the Wik
-file will delete the newly created org-mode file).
-
-Here are the steps (to edit the example table follow step ?0):
-(1) Type M-S-left in the place you want the table and when prompted
-    uniquely name the file with .org extension and no spaces (ie: temp.org).
-(2) Create the table in the other/org-mode window.
-(3) Type M-x wik-close-file and when prompted type yes to save.
-(4) Type M-S-right with the cursor positioned on the filepath
-    to bring in the content (and deletes the new file).
-?0) To send it back for editing mark the whole region of the table and follow
-the same 4 steps above.
-
-|--------------+--------------+-------------------|
-| MODE         | PARENT MODE  | GRAND PARENT MODE |
-|--------------+--------------+-------------------|
-| wik-mode     | outline-mode | text-mode         |
-|--------------+--------------+-------------------|
-| org-mode     | outline-mode | text-mode         |
-|--------------+--------------+-------------------|
-| outline-mode | text-mode    | N/A               |
-|--------------+--------------+-------------------|
-| text-mode    | N/A          | N/A               |
-|--------------+--------------+-------------------|
+Wik mode does not have a built-in table editor, but org-mode tables look nice. You can copy/paste between a new buffer, activate org-mode, edit the table and position it back into the wik file. You can alternatively just store the table in a .org file and reference it in the .wik and you can still take a peek at it using wik-peek (and wik-peek-discard to revert it).
 
 ORG-MODE COMPARISON * SOURCE FILES
 

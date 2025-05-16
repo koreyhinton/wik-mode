@@ -30,8 +30,8 @@
 ;;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*(?html)?[>]?\n")
 (setq wik-outline-heading-end-regexp "[A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n")
 
-(setq wik-kbd-wik-move-to-file "M-S-<left>")
-(setq wik-kbd-wik-move-from-file "M-S-<right>")
+(setq wik-kbd-wik-peek-discard "M-S-<left>")
+(setq wik-kbd-wik-peek "M-S-<right>")
 (setq wik-kbd-wik-open-file-at-point "M-S-<down>") ;"M-S-<down>"
 (setq wik-kbd-wik-close-file "M-S-<up>") ; "M-S-<up>"
 (setq wik-kbd-wik-repeat-heading "M-S-<return>")
@@ -44,8 +44,8 @@
   (setq case-fold-search nil)
   (setq outline-regexp wik-outline-regexp)
   (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
-  (define-key wik-mode-map (kbd wik-kbd-wik-move-to-file) 'wik-move-to-file)
-  (define-key wik-mode-map (kbd wik-kbd-wik-move-from-file) 'wik-move-from-file)
+  (define-key wik-mode-map (kbd wik-kbd-wik-peek-discard) 'wik-peek-discard)
+  (define-key wik-mode-map (kbd wik-kbd-wik-peek) 'wik-peek)
   (define-key wik-mode-map (kbd wik-kbd-wik-open-file-at-point) 'wik-open-file-at-point)
   (define-key wik-mode-map (kbd wik-kbd-wik-close-file) 'wik-close-file)
   (define-key wik-mode-map (kbd wik-kbd-wik-repeat-heading) 'wik-repeat-heading)
@@ -87,72 +87,49 @@
   (wik-mode)
   )
 
-(defun wik-move-to-file ()
+;; LITERATE PROGRAMMING FEATURE - PEEK
+(defun wik-peek-discard ()
   (interactive)
-  (let ((yanked nil) (file-name ".untitled"))
-    (if (use-region-p)
-	(progn
-	  (kill-region (region-beginning) (region-end))
-	  (setq yanked t)))
-    (setq file-name (read-file-name "move to file:"))
-    (insert file-name)
-    (find-file-other-window file-name)
-    (if (eq yanked t)
-	(progn
-	  (goto-char (point-max))
-	  (insert "\n")
-	  (yank)
-	  (message "done"))
-      (message "done"))
-    )
+  (end-of-line)
+  (re-search-backward "<<<<<<< PATH PEEKED")
+  (kill-line)
+  (kill-line)
+  (end-of-line) ;; =======
+  (kill-line)
+  (kill-line)
+  (kill-line)
+  (set-mark (point))
+  (re-search-forward ">>>>>>> PEEK")
+  (kill-region (mark) (point))
   )
 
-(defun wik-move-from-file ()
+;; There is a known abnormality when a path is not on its own line
+;; hello /my/path 1.txt world
+;;        ^__________^ (region selection)
+;; the conflict markers will appear but cannot go on their own line as they should
+;; and it will not be a proper wik heading (and manual emacs command navigation will be
+;; required to fix it.
+(defun wik-peek ()
   (interactive)
-  (let ((file-name ".untitled") (file-name-begin -99) (file-name-end))
-    (re-search-forward wik-file-path-end-regexp)
-    (backward-char)
-    (setq file-name-end (point)) ;
-    (re-search-backward wik-file-path-begin-regexp)
-    (forward-char)
-    (setq file-name-begin (point)) ;
-    (setq file-name (buffer-substring
-		     file-name-begin file-name-end)
-	  ) ;
-    (kill-region file-name-begin file-name-end)
-    (insert-file-contents file-name)
-    ;(delete-file file-name)
-    (message (concat "done. " file-name " was deleted"))
-    )
+  (let ((file-name (wik-file-at-point)))
+    (insert (concat "<<<<<<< PATH PEEKED" "\n"))
+    (forward-char (length file-name))
+    (insert (concat "\n" "=======" "\n"))
+    ;; you might think insert-file-contents would go to the end of the content,
+    ;; well it doesn't and the cursor stays just before the first content char
+    (let ((inserted-region (insert-file-contents file-name)))
+      (forward-char (cadr inserted-region)))
+    (unless (eq (char-before) ?\n)
+      (insert "\n"))
+    (insert ">>>>>>> PEEK")
+    (message "peek opened")
   )
+)
 
 (defun wik-open-file-at-point ()
   (interactive)
 
-  (let ((left-pt (point)) (right-pt (point)) (begin-pt -99) (end-pt -99)
-	(file-name ".untitled"))
-    (if (use-region-p)
-	(progn
-	  (setq left-pt (region-beginning))
-	  (setq right-pt (region-end))
-	  )
-      )
-    (goto-char right-pt)
-    (re-search-forward wik-file-path-end-regexp)
-    (backward-char)
-    (setq test (number-to-string (char-after (point))))
-    (if (char-equal (char-after (- (point) 1)) 46) ; 46 = .
-	(backward-char)
-      )
-    (if (char-equal (char-after (- (point) 1)) 34) ; 46 = "
-	(backward-char)
-	)
-    (setq end-pt (point)) ;
-    (goto-char left-pt)
-    (re-search-backward wik-file-path-begin-regexp)
-    (forward-char)
-    (setq begin-pt (point)) ;
-    (setq file-name (buffer-substring begin-pt end-pt))
+  (let ((file-name (wik-file-at-point)))
 
     (if (string-match-p "^\\./" file-name)
         ;; remove preceding ./ to make fallback folder ref substitution easier
@@ -180,11 +157,39 @@
     )
 
     (find-file-other-window file-name)
-    
-    (message test)
-    )
+
     (wik-mode)
-  )
+  ))
+
+(defun wik-file-at-point ()
+  (let ((left-pt (point)) (right-pt (point)) (begin-pt -99) (end-pt -99)
+	(file-name ".untitled"))
+    (if (use-region-p)
+	(progn
+	  (setq left-pt (region-beginning))
+	  (setq right-pt (region-end))
+	  )
+      )
+    (goto-char right-pt)
+    (re-search-forward wik-file-path-end-regexp)
+    (backward-char)
+
+    (if (char-equal (char-after (- (point) 1)) 46)
+	(backward-char)
+      )
+    (if (char-equal (char-after (- (point) 1)) 34)
+	(backward-char)
+	)
+    (setq end-pt (point))
+    (goto-char left-pt)
+    (re-search-backward wik-file-path-begin-regexp)
+    (forward-char)
+    (setq begin-pt (point)) ;
+    (setq file-name (buffer-substring begin-pt end-pt))
+    file-name
+  ))
+  
+  
 
 (defun wik-close-file ()
   (interactive)
