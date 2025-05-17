@@ -14,11 +14,39 @@
 ;;(define-key input-decode-map (kbd "M-n")  (kbd "<meta-n>"))
 
 ;; overrideable variables
-;(setq wik-file-path-begin-regexp "[ \n][{\\[]?"); "[ \n][\\{{\\[]?"
-(setq wik-file-path-begin-regexp "[\" \n][{\\[]?"); "[ \n][\\{{\\[]?"
-;(setq wik-file-path-end-regexp "[.,;\\)}a-zA-Z0-9]?[ \n]"); spaces must be marked in region  ; "[.,;\\)}\\]a-zA-Z0-9]?[ \n]"
-;;;; (setq wik-outline-regexp "[\/]*[#]*[ ]*[A-Z][A-Z]")
-(setq wik-file-path-end-regexp "[.,;\\)}a-zA-Z0-9]?[\" \n]"); spaces must be marked in region
+(setq wik-file-path-begin-regexp-old "[\" \n][{\\[]?"); spaces must be marked in region
+(setq wik-file-path-end-regexp-old "[.,;\\)}a-zA-Z0-9]?[\" \n]"); spaces must be marked in region
+
+;; wik-mode-elreg-file-path-begin-regexp
+;;   ^ elreg-generated var (file-path-begin-regexp.reg => wik-mode-elreg.el)
+;;
+;; Indicates the start of file path regex
+;;
+;; wik file path interpretation requires one of these path markers at the start:
+;;    ./file.txt
+;;    ~/file.txt
+;;    ../file.txt
+;;    /file.txt
+;;
+;; spaces must be marked in region:
+;; .\MyWindowsFile name.txt
+;;              ^___^
+;;               (region selection)
+;;
+;; regex parts explained:
+;;     (?:^|[ \n])        ; path-breaking (space, newline or start of line)
+;;     (?:\.{0,2}|~)?     ; optional 0-3 dots or optional tilde
+;;     (?:/|\\)           ; path slash
+;;
+
+;; wik-mode-elreg-file-path-end-regexp
+;;   ^ elreg-generated var (file-path-end-regexp.reg => wik-mode-elreg.el)
+;; 
+;; Indicates the end of file path regex
+;;
+;; regex parts explained:
+;;     (?:$|[ \n])        ; path-breaking (space, newline or end of line)
+
 (setq wik-outline-regexp "[-;\/# \*<!>]*[A-Z][A-Z]")  ;; - has to be at start,
                                                       ;; otherwise escape it
 
@@ -112,17 +140,22 @@
 (defun wik-peek ()
   (interactive)
   (let ((file-name (wik-file-at-point)))
-    (insert (concat "<<<<<<< PATH PEEKED" "\n"))
-    (forward-char (length file-name))
-    (insert (concat "\n" "=======" "\n"))
-    ;; you might think insert-file-contents would go to the end of the content,
-    ;; well it doesn't and the cursor stays just before the first content char
-    (let ((inserted-region (insert-file-contents file-name)))
-      (forward-char (cadr inserted-region)))
-    (unless (eq (char-before) ?\n)
-      (insert "\n"))
-    (insert ">>>>>>> PEEK")
-    (message "peek opened")
+    (if (and (file-exists-p file-name)
+         (not (file-directory-p file-name)))
+        (progn
+            (insert (concat "<<<<<<< PATH PEEKED" "\n"))
+            (forward-char (length file-name))
+            (insert (concat "\n" "=======" "\n"))
+            ;; you might think insert-file-contents would go to the end of the content,
+            ;; well it doesn't and the cursor stays just before the first content char
+            (let ((inserted-region (insert-file-contents file-name)))
+              (forward-char (cadr inserted-region)))
+            (unless (eq (char-before) ?\n)
+              (insert "\n"))
+            (insert ">>>>>>> PEEK")
+            (message "peek opened"))
+        (message "Error: File does not exist: %s" file-name)
+    )
   )
 )
 
@@ -171,8 +204,9 @@
 	  )
       )
     (goto-char right-pt)
-    (re-search-forward wik-file-path-end-regexp)
-    (backward-char)
+    (re-search-forward wik-mode-elreg-file-path-end-regexp)
+    (if (eq (char-before) 32) ; space
+        (backward-char))
 
     (if (char-equal (char-after (- (point) 1)) 46)
 	(backward-char)
@@ -182,8 +216,9 @@
 	)
     (setq end-pt (point))
     (goto-char left-pt)
-    (re-search-backward wik-file-path-begin-regexp)
-    (forward-char)
+    (re-search-backward wik-mode-elreg-file-path-begin-regexp)
+    (if (eq (char-after) 32) ; space
+        (forward-char))
     (setq begin-pt (point)) ;
     (setq file-name (buffer-substring begin-pt end-pt))
     file-name
@@ -255,8 +290,8 @@
   (let ( (collapse-pt (point-max)) )
     (save-excursion
       (goto-char 1)
-      (re-search-forward wik-file-path-begin-regexp)
-      (re-search-forward wik-file-path-end-regexp)
+      (re-search-forward wik-file-path-begin-regexp-old)
+      (re-search-forward wik-file-path-end-regexp-old)
       (while (not (= (point) collapse-pt))
 	(outline-hide-entry)
 	(setq collapse-pt (point))

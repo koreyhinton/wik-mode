@@ -1,0 +1,23 @@
+name: Test Emacs Package
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs-version: ['28.2', '29.1']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emacs
+        uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs-version }}
+
+      - name: Run tests
+        run: emacs --batch -Q -l tests/run.el
