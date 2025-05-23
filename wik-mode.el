@@ -115,20 +115,27 @@
   (wik-mode)
   )
 
+(defun wik-wipe-out-line ()
+    "Like kill-line without saving to clipboard"
+    (delete-region (point)
+        (if (eolp)
+            (min (point-max) (1+ (point)))
+            (line-end-position))))
+
 ;; LITERATE PROGRAMMING FEATURE - PEEK
 (defun wik-peek-discard ()
   (interactive)
   (end-of-line)
   (re-search-backward "<<<<<<< PATH PEEKED")
-  (kill-line)
-  (kill-line)
+  (wik-wipe-out-line)
+  (wik-wipe-out-line)
   (end-of-line) ;; =======
-  (kill-line)
-  (kill-line)
-  (kill-line)
+  (wik-wipe-out-line)
+  (wik-wipe-out-line)
+  (wik-wipe-out-line)
   (set-mark (point))
   (re-search-forward ">>>>>>> PEEK")
-  (kill-region (mark) (point))
+  (delete-region (mark) (point))
   )
 
 ;; There is a known abnormality when a path is not on its own line
