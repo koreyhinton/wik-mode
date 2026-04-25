@@ -58,6 +58,7 @@
 
 (setq wik-kbd-wik-peek-discard "C-c <left>")
 (setq wik-kbd-wik-peek "C-c <right>")
+(setq wik-kbd-wik-complete "C-c c") ;; complete
 (setq wik-kbd-wik-open-file-at-point "C-c <down>") ;"M-S-<down>"
 (setq wik-kbd-wik-close-file "C-c <up>") ; "M-S-<up>"
 (setq wik-kbd-wik-repeat-heading "C-c <return>")
@@ -85,6 +86,7 @@
   (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek-discard) 'wik-peek-discard)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek) 'wik-peek)
+  (define-key wik-mode-map (kbd wik-kbd-wik-complete) 'wik-complete)
   (define-key wik-mode-map (kbd wik-kbd-wik-open-file-at-point) 'wik-open-file-at-point)
   (define-key wik-mode-map (kbd wik-kbd-wik-close-file) 'wik-close-file)
   (define-key wik-mode-map (kbd wik-kbd-wik-repeat-heading) 'wik-repeat-heading)
@@ -167,16 +169,28 @@
 (defun wik-peek ()
   (interactive)
   (let ((file-name (wik-file-at-point)))
-    (if (and (file-exists-p file-name)
-         (not (file-directory-p file-name)))
+    (if (file-exists-p file-name)
         (progn
             (insert (concat "<<<<<<< PATH PEEKED" "\n"))
             (forward-char (length file-name))
             (insert (concat "\n" "=======" "\n"))
-            ;; you might think insert-file-contents would go to the end of the content,
-            ;; well it doesn't and the cursor stays just before the first content char
-            (let ((inserted-region (insert-file-contents file-name)))
-              (forward-char (cadr inserted-region)))
+            (if (file-directory-p file-name)
+                (insert
+                    (mapconcat (lambda (f) (concat "./" f))
+                        (directory-files
+                            file-name
+                            nil
+                            directory-files-no-dot-files-regexp
+                        )
+                        "\n"
+                    )
+                )
+                (let ((inserted-region (insert-file-contents file-name)))
+                    ;; you might think insert-file-contents would go to the end of the content,
+                    ;; well it doesn't and the cursor stays just before the first content char
+                    (forward-char (cadr inserted-region))
+                )
+            )
             (unless (eq (char-before) ?\n)
               (insert "\n"))
             (insert ">>>>>>> PEEK")
@@ -184,6 +198,16 @@
         (message "Error: File does not exist: %s" file-name)
     )
   )
+)
+
+(defun wik-complete ()
+    (interactive)
+    (let ((file-name-last-comp (wik-file-at-point)))
+        (wik-peek-discard)
+        (unless (eq (char-before) ?/)
+            (insert "/"))
+        (insert (substring file-name-last-comp 2)) ;; (message "%s" file-name-last-comp) 
+    )
 )
 
 (defun wik-open-file-at-point ()

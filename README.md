@@ -12,17 +12,22 @@ rather than M-S (fixes shift clashing with terminal's control-shift).
 
 Peek: a newly added literate programming feature. Write a manifest-style `.wik`
 page composed of file links. Use peek to preview the contents of linked code
-files, in the order you've specified in the manifest.
+files, in the order you've specified in the manifest. Directory peek is now
+supported.
 
 ``` text
-M-S-LEFT (wik-peek-discard)
+C-c <left> (wik-peek-discard)
     Revert the peeked contents back to only be a simple file path.
 
-M-S-RIGHT (wik-peek)
+C-c <right> (wik-peek)
     Inserts conflict markers around a file path and its peeked contents.
     This previews the contents inline without editing the original file.
     Use `wik-peek-discard` to remove the preview and restore just the path.
     Note: any changes made to the peeked content will be lost when discarded.
+
+C-c c (wik-complete)
+    Completes the peeked directory item at the cursor point (in a more manual
+    form of auto-completion all in done in the buffer)
 ```
 
 ### PEEK PATH
