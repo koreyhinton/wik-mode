@@ -2,6 +2,8 @@
 
 Plain wiki-style notes in Emacs with zero syntax overhead.
 
+Tested on Emacs version 30.2
+
 ## LEGACY DOCUMENTATION
 
 See the [WIK-MODE-DOCUMENTATION.wik](WIK-MODE-DOCUMENTATION.wik) file,

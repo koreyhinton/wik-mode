@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        emacs-version: ['28.2', '29.1']
+        emacs-version: ['30.2']
 
     steps:
       - uses: actions/checkout@v4
