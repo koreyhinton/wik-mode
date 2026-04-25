@@ -5,13 +5,11 @@
 ;; these commands:
 ;;   M-S-<up>   (wik-close-file)
 ;;   M-S-<down> (wik-open-file-at-point)
-(define-key input-decode-map "\e\eOA" [(meta up)])
-(define-key input-decode-map "\e\eOB" [(meta down)])
-(define-key input-decode-map "\e\eOC" [(meta n)])
-(define-key input-decode-map "\e\eOD" [(meta *)]) ;(kbd "M-*"))
-;;(define-key input-decode-map "\e\eOD" (kbd "M-*"))
-;;(define-key input-decode-map "\e\eOD" [(meta 8)]) ;(kbd "M-*"))
-;;(define-key input-decode-map (kbd "M-n")  (kbd "<meta-n>"))
+
+  ;; (define-key input-decode-map "\e\eOA" [(meta up)])
+  ;; (define-key input-decode-map "\e\eOB" [(meta down)])
+  ;; (define-key input-decode-map "\e\eOC" [(meta n)])
+  ;; (define-key input-decode-map "\e\eOD" [(meta *)]) ;(kbd "M-*"))
 
 ;; overrideable variables
 (setq wik-file-path-begin-regexp-old "[\" \n][{\\[]?"); spaces must be marked in region
@@ -58,17 +56,30 @@
 ;;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*(?html)?[>]?\n")
 (setq wik-outline-heading-end-regexp "[A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n")
 
-(setq wik-kbd-wik-peek-discard "M-S-<left>")
-(setq wik-kbd-wik-peek "M-S-<right>")
-(setq wik-kbd-wik-open-file-at-point "M-S-<down>") ;"M-S-<down>"
-(setq wik-kbd-wik-close-file "M-S-<up>") ; "M-S-<up>"
-(setq wik-kbd-wik-repeat-heading "M-S-<return>")
+(setq wik-kbd-wik-peek-discard "C-c <left>")
+(setq wik-kbd-wik-peek "C-c <right>")
+(setq wik-kbd-wik-open-file-at-point "C-c <down>") ;"M-S-<down>"
+(setq wik-kbd-wik-close-file "C-c <up>") ; "M-S-<up>"
+(setq wik-kbd-wik-repeat-heading "C-c <return>")
+(setq wik-kbd-wik-wik-next-heading "C-c n")
+(setq wik-kbd-wik-wik-previous-heading "C-c p")
+(setq wik-kbd-wik-wik-all-heading-collapse "C-c *")
+(setq wik-kbd-wik-wik-all-heading-expand "C-c a")
+(setq wik-kbd-wik-wik-outline-entry-toggle "C-c o")
+(setq wik-kbd-wik-wik-find-file "C-c f")
 
 ;;(defvar wik-mode-map nil "Keymap for `wik-mode'")
-(setq wik-mode-map (make-sparse-keymap))
+;(setq wik-mode-map (make-sparse-keymap)) ;; removed due to outline actions overriding line up/down
+					;(setq wik-mode-map (make-keymap))
 
-;; WIK MODE - OUTLINE MODE DERIVATION
-(define-derived-mode wik-mode outline-mode "WIK"
+; control-q Meta-Shift up (to see what the input decode map key is)
+;; (define-key input-decode-map "\e[1;4A" [(meta shift up)])
+;; (define-key input-decode-map "\e[1;4B" [(meta shift down)])
+;; (define-key input-decode-map "\e[1;4C" [(meta shift right)])
+;; (define-key input-decode-map "\e[1;4D" [(meta shift left)])
+;  (setq wik-mode-map (make-sparse-keymap));; (setq wik-mode-map (copy-keymap (current-local-map)))
+
+ (setq wik-mode-map (make-sparse-keymap)) 
   (setq case-fold-search nil)
   (setq outline-regexp wik-outline-regexp)
   (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
@@ -78,21 +89,30 @@
   (define-key wik-mode-map (kbd wik-kbd-wik-close-file) 'wik-close-file)
   (define-key wik-mode-map (kbd wik-kbd-wik-repeat-heading) 'wik-repeat-heading)
   ;;(define-key wik-mode-map (kbd "M-S-n") 'outline-next-heading)
-  (define-key wik-mode-map [(meta shift n)] 'wik-next-heading) ; 'outline-next-heading)
-  (define-key wik-mode-map [(meta shift p)] 'wik-previous-heading) ;'outline-previous-heading)
-  (define-key wik-mode-map (kbd "M-#") 'wik-previous-heading) ;'outline-previous-heading)
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-next-heading) 'wik-next-heading) ; 'outline-next-heading)
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-previous-heading) 'wik-previous-heading) ;'outline-previous-heading)
+  ;;(define-key wik-mode-map (kbd "M-#") 'wik-previous-heading) ;'outline-previous-heading)
 
-  (define-key wik-mode-map [(meta *)] 'wik-all-heading-collapse) ;;if same point then toggle all?
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-all-heading-collapse) 'wik-all-heading-collapse) ;;if same point then toggle all?
   ;;(define-key wik-mode-map (kbd "M-S-*") 'wik-all-heading-collapse) ;;if same point then toggle all?
   ;;(define-key wik-mode-map (kbd "M-*") 'wik-all-heading-expand)
-  (define-key wik-mode-map [(meta shift a)] 'wik-all-heading-expand)
-  (define-key wik-mode-map [(meta shift o)] 'wik-outline-entry-toggle)
-  (define-key wik-mode-map [(tab)] 'wik-indent)
-  (define-key wik-mode-map [(return)] 'wik-nl)
-  (define-key wik-mode-map [(meta shift f)] 'wik-find-file)
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-all-heading-expand) 'wik-all-heading-expand)
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-outline-entry-toggle) 'wik-outline-entry-toggle)
+  ;;(define-key wik-mode-map [(tab)] 'wik-indent)
+  (define-key wik-mode-map (kbd "TAB") 'wik-indent)
+  ;;(define-key wik-mode-map [(return)] 'wik-nl)
+  (define-key wik-mode-map (kbd "RET") 'wik-nl)
+  (define-key wik-mode-map (kbd wik-kbd-wik-wik-find-file) 'wik-find-file)
+
+
+;; WIK MODE - OUTLINE MODE DERIVATION
+(define-derived-mode wik-mode outline-mode "WIK"
+
+  ;;(setq wik-mode-map (copy-keymap outline-mode-map))
+
+
+  ;; re-define arrow key to not do outline actions (in more recent versions of outline-mode)
   )
-
-
 
 ;; (add-to-list 'auto-mode-alist '("/READ*\\'" . wik-mode))
 

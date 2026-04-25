@@ -4,7 +4,9 @@ Plain wiki-style notes in Emacs with zero syntax overhead.
 
 ## LEGACY DOCUMENTATION
 
-See the [WIK-MODE-DOCUMENTATION.wik](WIK-MODE-DOCUMENTATION.wik) file
+See the [WIK-MODE-DOCUMENTATION.wik](WIK-MODE-DOCUMENTATION.wik) file,
+except commands now use a more standard user command prefix C-c
+rather than M-S (fixes shift clashing with terminal's control-shift).
 
 ## NEW (WIP) DOCUMENTATION
 
