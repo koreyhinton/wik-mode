@@ -4,6 +4,10 @@ Plain wiki-style notes in Emacs with zero syntax overhead.
 
 Tested on Emacs version 30.2
 
+## DEPENDENCIES
+
+load wik-mode-elreg.el before loading wik-mode.el
+
 ## LEGACY DOCUMENTATION
 
 See the [WIK-MODE-DOCUMENTATION.wik](WIK-MODE-DOCUMENTATION.wik) file,
@@ -76,4 +80,9 @@ generate the regular expression file using elreg:
 
 ```sh
 python3 /path/to/elreg.py "wik-mode" *.reg > wik-mode-elreg.el
+```
+run tests (using latest emacs 30.2)
+
+```sh
+emacs --batch -Q -l tests/run.el
 ```

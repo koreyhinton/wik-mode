@@ -1,5 +1,10 @@
 ;; WIK MODE - VARS
 
+;; Custom errors
+(define-error 'wik-mode-error "Wik Mode General Error" 'error)
+(define-error 'wik-mode-expected-peek-error "Expected peek before complete" 'wik-mode-error)
+(define-error 'wik-mode-nested-peek-error "Nested peeking is not supported" 'wik-mode-error)
+
 ;; This is a hack to get M-<up>, M-<down> working
 ;; which will allow the wik-mode-map keybinding for
 ;; these commands:
@@ -147,6 +152,11 @@
 ;; LITERATE PROGRAMMING FEATURE - PEEK
 (defun wik-peek-discard ()
   (interactive)
+  (save-excursion
+      (end-of-line)
+      (unless
+          (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+          (signal 'wik-mode-expected-peek-error nil)))
   (end-of-line)
   (re-search-backward "<<<<<<< PATH PEEKED")
   (wik-wipe-out-line)
@@ -169,6 +179,10 @@
 (defun wik-peek ()
   (interactive)
   (let ((file-name (wik-file-at-point)))
+    (save-excursion
+        (if
+            (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+            (signal 'wik-mode-nested-peek-error nil)))
     (if (file-exists-p file-name)
         (progn
             (insert (concat "<<<<<<< PATH PEEKED" "\n"))
@@ -202,11 +216,15 @@
 
 (defun wik-complete ()
     (interactive)
+    (save-excursion
+        (unless
+            (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+            (signal 'wik-mode-expected-peek-error nil)))
     (let ((file-name-last-comp (wik-file-at-point)))
         (wik-peek-discard)
         (unless (eq (char-before) ?/)
             (insert "/"))
-        (insert (substring file-name-last-comp 2)) ;; (message "%s" file-name-last-comp) 
+        (insert (substring file-name-last-comp 2)) ;; todo: add 'is a directory peek' guard to top of function (Issue #3) since a directory peek is guaranteed to have ./ path marker in front of each sub-item
     )
 )
 
