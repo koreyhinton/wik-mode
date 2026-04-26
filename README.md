@@ -33,7 +33,7 @@ C-c <right> (wik-peek)
 
 C-c c (wik-complete)
     Completes the peeked directory item at the cursor point (in a more manual
-    form of auto-completion all in done in the buffer)
+    form of auto-completion all done in the buffer)
 ```
 
 ### PEEK PATH
