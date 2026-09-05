@@ -50,8 +50,15 @@
 ;; regex parts explained:
 ;;     (?:$|[ \n])        ; path-breaking (space, newline or end of line)
 
-(setq wik-outline-regexp "[-;\/# \*<!>]*[A-Z][A-Z]")  ;; - has to be at start,
-                                                      ;; otherwise escape it
+; start-heading
+(setq wik-outline-regexp
+    "[A-Z0-9]+ [A-Z0-9]"
+    )  ;; - has to be at start, otherwise escape it
+;; old: "[-;\/# \*<!>]*[A-Z][A-Z]"
+
+; end-heading
+(setq wik-outline-heading-end-regexp "$")
+;; old: [A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n
 
 ;;(setq wik-outline-heading-end-regexp "[A-Z0-9 _*\n]+[A-Z0-9 _*]\n")
 ;;;(setq wik-outline-heading-end-regexp "[A-Z0-9 _*\n]+[\/]*[#]*[ ]*[A-Z0-9 _*][A-Z0-9 _*]\n")
@@ -59,7 +66,6 @@
 ;;;;; (setq wik-outline-heading-end-regexp "[\/# \*<!->]*[A-Z][A-Z][\/# \*<!->0-9_-]*\n")
 ;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*\n")
 ;;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*(?html)?[>]?\n")
-(setq wik-outline-heading-end-regexp "[A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n")
 
 (setq wik-kbd-wik-peek-discard "C-c <left>")
 (setq wik-kbd-wik-peek "C-c <right>")
@@ -88,7 +94,8 @@
  (setq wik-mode-map (make-sparse-keymap)) 
   (setq case-fold-search nil)
   (setq outline-regexp wik-outline-regexp)
-  (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
+  ;; don't set it, just let it be the default newline instead:
+      ;; (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek-discard) 'wik-peek-discard)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek) 'wik-peek)
   (define-key wik-mode-map (kbd wik-kbd-wik-complete) 'wik-complete)
@@ -287,6 +294,8 @@
     (goto-char left-pt)
     (re-search-backward wik-mode-elreg-file-path-begin-regexp)
     (if (eq (char-after) 32) ; space
+        (forward-char))
+    (if (eq (char-after) ?") ; dbl quote
         (forward-char))
     (setq begin-pt (point)) ;
     (setq file-name (buffer-substring begin-pt end-pt))
