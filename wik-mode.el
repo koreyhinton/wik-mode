@@ -1,5 +1,10 @@
 ;; WIK MODE - VARS
 
+;; Custom errors
+(define-error 'wik-mode-error "Wik Mode General Error" 'error)
+(define-error 'wik-mode-expected-peek-error "Expected peek before complete" 'wik-mode-error)
+(define-error 'wik-mode-nested-peek-error "Nested peeking is not supported" 'wik-mode-error)
+
 ;; This is a hack to get M-<up>, M-<down> working
 ;; which will allow the wik-mode-map keybinding for
 ;; these commands:
@@ -45,8 +50,15 @@
 ;; regex parts explained:
 ;;     (?:$|[ \n])        ; path-breaking (space, newline or end of line)
 
-(setq wik-outline-regexp "[-;\/# \*<!>]*[A-Z][A-Z]")  ;; - has to be at start,
-                                                      ;; otherwise escape it
+; start-heading
+(setq wik-outline-regexp
+    "[A-Z0-9]+ [A-Z0-9]"
+    )  ;; - has to be at start, otherwise escape it
+;; old: "[-;\/# \*<!>]*[A-Z][A-Z]"
+
+; end-heading
+(setq wik-outline-heading-end-regexp "$")
+;; old: [A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n
 
 ;;(setq wik-outline-heading-end-regexp "[A-Z0-9 _*\n]+[A-Z0-9 _*]\n")
 ;;;(setq wik-outline-heading-end-regexp "[A-Z0-9 _*\n]+[\/]*[#]*[ ]*[A-Z0-9 _*][A-Z0-9 _*]\n")
@@ -54,10 +66,10 @@
 ;;;;; (setq wik-outline-heading-end-regexp "[\/# \*<!->]*[A-Z][A-Z][\/# \*<!->0-9_-]*\n")
 ;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*\n")
 ;;;;;;;(setq wik-outline-heading-end-regexp "[A-Z][A-Z][-\/# \*<!>0-9_]*(?html)?[>]?\n")
-(setq wik-outline-heading-end-regexp "[A-Z][A-Z][ ]?[h]?[t]?[m]?[l]?[-\/# \*<!>0-9_]*\n")
 
 (setq wik-kbd-wik-peek-discard "C-c <left>")
 (setq wik-kbd-wik-peek "C-c <right>")
+(setq wik-kbd-wik-complete "C-c c") ;; complete
 (setq wik-kbd-wik-open-file-at-point "C-c <down>") ;"M-S-<down>"
 (setq wik-kbd-wik-close-file "C-c <up>") ; "M-S-<up>"
 (setq wik-kbd-wik-repeat-heading "C-c <return>")
@@ -82,9 +94,11 @@
  (setq wik-mode-map (make-sparse-keymap)) 
   (setq case-fold-search nil)
   (setq outline-regexp wik-outline-regexp)
-  (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
+  ;; don't set it, just let it be the default newline instead:
+      ;; (setq outline-heading-end-regexp wik-outline-heading-end-regexp)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek-discard) 'wik-peek-discard)
   (define-key wik-mode-map (kbd wik-kbd-wik-peek) 'wik-peek)
+  (define-key wik-mode-map (kbd wik-kbd-wik-complete) 'wik-complete)
   (define-key wik-mode-map (kbd wik-kbd-wik-open-file-at-point) 'wik-open-file-at-point)
   (define-key wik-mode-map (kbd wik-kbd-wik-close-file) 'wik-close-file)
   (define-key wik-mode-map (kbd wik-kbd-wik-repeat-heading) 'wik-repeat-heading)
@@ -145,6 +159,11 @@
 ;; LITERATE PROGRAMMING FEATURE - PEEK
 (defun wik-peek-discard ()
   (interactive)
+  (save-excursion
+      (end-of-line)
+      (unless
+          (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+          (signal 'wik-mode-expected-peek-error nil)))
   (end-of-line)
   (re-search-backward "<<<<<<< PATH PEEKED")
   (wik-wipe-out-line)
@@ -167,16 +186,32 @@
 (defun wik-peek ()
   (interactive)
   (let ((file-name (wik-file-at-point)))
-    (if (and (file-exists-p file-name)
-         (not (file-directory-p file-name)))
+    (save-excursion
+        (if
+            (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+            (signal 'wik-mode-nested-peek-error nil)))
+    (if (file-exists-p file-name)
         (progn
             (insert (concat "<<<<<<< PATH PEEKED" "\n"))
             (forward-char (length file-name))
             (insert (concat "\n" "=======" "\n"))
-            ;; you might think insert-file-contents would go to the end of the content,
-            ;; well it doesn't and the cursor stays just before the first content char
-            (let ((inserted-region (insert-file-contents file-name)))
-              (forward-char (cadr inserted-region)))
+            (if (file-directory-p file-name)
+                (insert
+                    (mapconcat (lambda (f) (concat "./" f))
+                        (directory-files
+                            file-name
+                            nil
+                            directory-files-no-dot-files-regexp
+                        )
+                        "\n"
+                    )
+                )
+                (let ((inserted-region (insert-file-contents file-name)))
+                    ;; you might think insert-file-contents would go to the end of the content,
+                    ;; well it doesn't and the cursor stays just before the first content char
+                    (forward-char (cadr inserted-region))
+                )
+            )
             (unless (eq (char-before) ?\n)
               (insert "\n"))
             (insert ">>>>>>> PEEK")
@@ -184,6 +219,20 @@
         (message "Error: File does not exist: %s" file-name)
     )
   )
+)
+
+(defun wik-complete ()
+    (interactive)
+    (save-excursion
+        (unless
+            (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+            (signal 'wik-mode-expected-peek-error nil)))
+    (let ((file-name-last-comp (wik-file-at-point)))
+        (wik-peek-discard)
+        (unless (eq (char-before) ?/)
+            (insert "/"))
+        (insert (substring file-name-last-comp 2)) ;; todo: add 'is a directory peek' guard to top of function (Issue #3) since a directory peek is guaranteed to have ./ path marker in front of each sub-item
+    )
 )
 
 (defun wik-open-file-at-point ()
@@ -245,6 +294,8 @@
     (goto-char left-pt)
     (re-search-backward wik-mode-elreg-file-path-begin-regexp)
     (if (eq (char-after) 32) ; space
+        (forward-char))
+    (if (eq (char-after) ?") ; dbl quote
         (forward-char))
     (setq begin-pt (point)) ;
     (setq file-name (buffer-substring begin-pt end-pt))
