@@ -278,7 +278,65 @@
 	  (setq left-pt (region-beginning))
 	  (setq right-pt (region-end))
 	  )
-      )
+        (progn
+            (setq wik-file-at-point-moved nil)
+            (while (eq (char-after right-pt) ?.)
+                (progn
+                    (forward-char)
+                    (setq right-pt (point))
+                    (setq wik-file-at-point-moved t)
+                ))
+            (if (eq (char-after (point)) ?/)
+                (progn
+                    (forward-char)
+                    (setq right-pt (point))
+                    (setq wik-file-at-point-moved t)
+                )
+            )
+            (if wik-file-at-point-moved
+                (progn
+                    (backward-char)
+                    (setq right-pt (point))
+                )
+            )
+            (setq wik-file-at-point-moved nil)
+
+            (goto-char left-pt)
+            ;; ..
+            (if (and
+                    (eq (char-after left-pt) ?.)
+                    (eq (char-after (+ left-pt 1)) ?.))
+                (progn
+                    (forward-char)
+                    (setq left-pt (point))
+                ))
+            ;; ./
+            (if (and
+                    (eq (char-after left-pt) ?.)
+                    (eq (char-after (+ left-pt 1)) ?/))
+                (progn
+                    (forward-char)
+                    (forward-char) ; must be beyond the slash to search backward
+                    (setq left-pt (point))
+                ))
+            ;; ./
+            (if (and
+                    (eq (char-after left-pt) ?~)
+                    (eq (char-after (+ left-pt 1)) ?/))
+                (progn
+                    (forward-char)
+                    (forward-char) ; must be beyond the slash to search backward
+                    (setq left-pt (point))
+                ))
+            )
+            ;; /
+            (if (eq (char-after left-pt) ?/)
+                (progn
+                    (forward-char) ; must be beyond the slash to search backward
+                    (setq left-pt (point))
+                )
+            )
+        )
     (goto-char right-pt)
     (re-search-forward wik-mode-elreg-file-path-end-regexp)
     (if (eq (char-before) 32) ; space
@@ -292,17 +350,20 @@
 	)
     (setq end-pt (point))
     (goto-char left-pt)
-    (re-search-backward wik-mode-elreg-file-path-begin-regexp)
-    (if (eq (char-after) 32) ; space
-        (forward-char))
-    (if (eq (char-after) ?") ; dbl quote
-        (forward-char))
-    (setq begin-pt (point)) ;
-    (setq file-name (buffer-substring begin-pt end-pt))
-    file-name
+    (condition-case nil
+        (progn
+            (re-search-backward wik-mode-elreg-file-path-begin-regexp)
+            (if (eq (char-after) 32) ; space
+                (forward-char))
+            (if (eq (char-after) ?") ; dbl quote
+                (forward-char))
+            (setq begin-pt (point)) ;
+            (setq file-name (buffer-substring begin-pt end-pt))
+            file-name
+        )
+        (search-failed
+            (message ". To fix use leading path markers: ~ . /")))
   ))
-  
-  
 
 (defun wik-close-file ()
   (interactive)
