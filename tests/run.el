@@ -15,7 +15,7 @@
 (setq
     wik-mode-dir
     (expand-file-name "../"
-        (file-name-parent-directory  (or load-file-name buffer-file-name))
+        (file-name-directory  (or load-file-name buffer-file-name))
     )) ; test-peek-dir.el, test-peek-nested.el require wik-mode-dir
 
 ;; WIK COMPLETE TESTS

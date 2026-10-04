@@ -5,10 +5,15 @@
   (interactive)
   (with-temp-buffer
     ;; arrange
-    (insert "<<<<<<< PATH PEEKED\nsome-file.txt\n=======\n(file contents)\n>>>>>>> PEEK")
+    (insert "<<<<<<< PATH PEEKED\n")
+    (insert wik-mode-dir)
+    (insert "tests/some-file.txt\n=======\n(file contents)\n>>>>>>> PEEK")
     (message "BUFFER BEFORE:\n%s" (buffer-string))
     ;; act
     (goto-char (point-min))
     (wik-peek-discard)
     ;; assert
-    (should (equal (buffer-string) "some-file.txt"))))
+    (should (equal
+        (buffer-string)
+        (concat wik-mode-dir "tests/some-file.txt")
+    ))))
