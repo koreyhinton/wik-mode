@@ -4,6 +4,15 @@
 (define-error 'wik-mode-error "Wik Mode General Error" 'error)
 (define-error 'wik-mode-expected-peek-error "Expected peek before complete" 'wik-mode-error)
 (define-error 'wik-mode-nested-peek-error "Nested peeking is not supported" 'wik-mode-error)
+(define-error
+    'wik-mode-invalid-peek-error
+    "Cannot peek file if the file contains conflict markers"
+    'wik-mode-error)
+(define-error
+    'wik-mode-invalid-discard-peek-error
+    (concat "Cannot discard a peek when it differs from the file, "
+        "resolve manually by looking at both versions.")
+    'wik-mode-error)
 
 ;; This is a hack to get M-<up>, M-<down> working
 ;; which will allow the wik-mode-map keybinding for
@@ -158,23 +167,71 @@
 
 ;; LITERATE PROGRAMMING FEATURE - PEEK
 (defun wik-peek-discard ()
-  (interactive)
-  (save-excursion
-      (end-of-line)
-      (unless
-          (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
-          (signal 'wik-mode-expected-peek-error nil)))
-  (end-of-line)
-  (re-search-backward "<<<<<<< PATH PEEKED")
-  (wik-wipe-out-line)
-  (wik-wipe-out-line)
-  (end-of-line) ;; =======
-  (wik-wipe-out-line)
-  (wik-wipe-out-line)
-  (wik-wipe-out-line)
-  (set-mark (point))
-  (re-search-forward ">>>>>>> PEEK")
-  (delete-region (mark) (point))
+    (interactive)
+    (save-excursion
+        (end-of-line)
+        (unless
+            (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
+            (signal 'wik-mode-expected-peek-error nil)))
+
+
+    ;; GUARDS FOR PEEK FILE DIFFERENCES:
+    ;; This is tedious to read and compare the content here, but a simpler
+    ;; approach (temporarily storing the contents of the file as you peek it)
+    ;; wouldn't save user from them mistakenly editing the peek and wanting
+    ;; to keep the misplaced edits without discarding them
+    (save-excursion
+        ; get back to start of conflict marker, even if positioned on the marker
+        (if (not (re-search-backward "<<<<<<< PATH PEEKED" nil t)) ; noerror=t
+            (progn
+                (re-search-forward ">>>>>>> PEEK")
+                (re-search-backward "<<<<<<< PATH PEEKED")))
+        ; proceed to file and peek content, and bail if they are not the same
+        (next-line)
+        (beginning-of-line)
+        (setq wik-peek-discard-pt1 (point))
+        (end-of-line)
+        (setq wik-peek-discard-pt2 (point))
+        (setq wik-peek-discard-a-fname
+            (buffer-substring-no-properties
+                wik-peek-discard-pt1
+                wik-peek-discard-pt2))
+        (if (not (file-exists-p wik-peek-discard-a-fname))
+            (signal 'wik-mode-invalid-discard-peek-error nil))
+        (if (file-regular-p wik-peek-discard-a-fname)
+            (progn
+                (setq wik-peek-discard-a
+                    (with-temp-buffer
+                        (insert-file-contents wik-peek-discard-a-fname)
+                        (buffer-string)))
+                (next-line)
+                (next-line)
+                (beginning-of-line)
+                (setq wik-peek-discard-pt1 (point))
+                (re-search-forward ">>>>>>> PEEK")
+                (previous-line)
+                (end-of-line)
+                (setq wik-peek-discard-pt2 (point))
+                (setq wik-peek-discard-b
+                    (concat
+                        (buffer-substring-no-properties
+                            wik-peek-discard-pt1 wik-peek-discard-pt2)
+                        "\n"))
+                (if (not (string= wik-peek-discard-a wik-peek-discard-b))
+                    (signal 'wik-mode-invalid-discard-peek-error nil))))
+            )
+
+    (end-of-line)
+    (re-search-backward "<<<<<<< PATH PEEKED")
+    (wik-wipe-out-line)
+    (wik-wipe-out-line)
+    (end-of-line) ;; =======
+    (wik-wipe-out-line)
+    (wik-wipe-out-line)
+    (wik-wipe-out-line)
+    (set-mark (point))
+    (re-search-forward ">>>>>>> PEEK")
+    (delete-region (mark) (point))
   )
 
 ;; There is a known abnormality when a path is not on its own line
@@ -190,6 +247,13 @@
         (if
             (re-search-backward "<<<<<<< PATH PEEKED" nil t) ; noerror=t
             (signal 'wik-mode-nested-peek-error nil)))
+    (if (file-exists-p file-name)
+        (if (file-regular-p file-name)
+            (with-temp-buffer
+                (insert-file-contents file-name)
+                    (if
+                        (re-search-forward "<<<<<<<" nil t) ; noerror=t
+                        (signal 'wik-mode-invalid-peek-error nil)))))
     (if (file-exists-p file-name)
         (progn
             (insert (concat "<<<<<<< PATH PEEKED" "\n"))
@@ -319,7 +383,7 @@
                     (forward-char) ; must be beyond the slash to search backward
                     (setq left-pt (point))
                 ))
-            ;; ./
+            ;; ~/
             (if (and
                     (eq (char-after left-pt) ?~)
                     (eq (char-after (+ left-pt 1)) ?/))
@@ -355,7 +419,7 @@
             (re-search-backward wik-mode-elreg-file-path-begin-regexp)
             (if (eq (char-after) 32) ; space
                 (forward-char))
-            (if (eq (char-after) ?") ; dbl quote
+            (if (eq (char-after) ?\") ; dbl quote
                 (forward-char))
             (setq begin-pt (point)) ;
             (setq file-name (buffer-substring begin-pt end-pt))
@@ -375,47 +439,37 @@
 
 ;; WIK MODE - FUNCTIONS - WIK-REPEAT-HEADING
 (defun wik-repeat-heading ()
-  (interactive)
-  (let ( (heading-begin (point)) (heading-end (point)) )
-    (save-excursion
-      ;;(outline-previous-heading)
-      ;;(outline-previous-heading)
-      (wik-previous-heading)
-      (setq heading-begin (point))
-      (re-search-forward wik-outline-heading-end-regexp)
-      (setq heading-end (point))
+    (interactive)
+    ; note: headings are now single line (as outline mode expects them to be)
+    (let ( (heading-begin (point)) (heading-end (point)) )
 
-      ;; calc heading end point if multiline
-      (setq heading-line-first (line-number-at-pos))
-      (setq heading-line-last (line-number-at-pos))
-      (while (string-equal (number-to-string heading-line-first) (number-to-string heading-line-last))
-        (progn
-          (if (re-search-forward wik-outline-heading-end-regexp nil t)
-            (setq heading-line-last (line-number-at-pos))
-            (setq heading-line-last -99))
-          
-          (if (string-equal (number-to-string heading-line-first) (number-to-string heading-line-last))
-              (setq heading-line-last -99)
-              (if (string-equal (number-to-string (+ heading-line-first 1)) (number-to-string heading-line-last))
-                (progn (setq heading-end (point)) (setq heading-line-first (line-number-at-pos)))
-                (setq heading-line-last -99))
-          )
+        (save-excursion
+            ; back 2 forward 1 (plus conditional extra 1) works when:
+            ;     at starting point (invisible) heading
+            ;         (and copies in the first visible heading)
+            ;     at end point (invisble) heading
+            ;         (and copies in the last visible heading)
+            ;     sandwiched between headings
+            ;         (and copies in the heading above it)
+            (wik-previous-heading)
+            (setq wik-repeat-heading-double-forward nil)
+            (if (not (eq (point) 1))
+                (setq wik-repeat-heading-double-forward t))
+            (wik-previous-heading)
+            (wik-next-heading)
+            (if wik-repeat-heading-double-forward
+                (wik-next-heading))
+            (setq heading-begin (point))
+            (re-search-forward wik-outline-heading-end-regexp)
+            (setq heading-end (point))
         )
-      )
-    )
-    ;;;;(outline-next-heading)
 
-    ;(if (eq (- (char-after (point)) 1) "\n")
-    ;(if (eq (char-after (- (point) 1)) 10)
-    (if (eq (char-after (- (point) 1)) 10)
-	 nil (progn (insert "\n")))
-    (insert (buffer-substring heading-begin heading-end))
-    ;;(insert (concat "\n" (buffer-substring wik-repeat-heading-begin wik-repeat-heading-end)))
-    ;;  )
-    (delete-backward-char 1)
-    ;;;;(insert "\n")
-    ;;;;(backward-char)
-    ;;;;(backward-char)
+        ;; todo: if heading is a log in the format YYYY-MM-DD
+                 ; then replace the values with the current date
+        ;; todo: at end of the file (following heading and body content) it
+                 ; isn't going back 2 headings, and isn't able to repeat
+
+        (insert (buffer-substring heading-begin heading-end))
     )
   )
 
@@ -441,83 +495,13 @@
   )
 
 (defun wik-next-heading ()
-  (interactive)
-  ;; (end-of-line)
-  ;; (re-search-backward (concat "^" wik-outline-regexp) nil t)
-  ;; (re-search-forward wik-outline-heading-end-regexp)
-  ;; (beginning-of-line)
-  ;; (outline-next-heading)
-
-  (let ( (y-start (line-number-at-pos)) (y-head (line-number-at-pos)) (x-start -99) (x-head -99) )
-    ;; go forward to the nearest heading line
-    ;; unless already on a heading line
-    ;; in which case keep searching lines forward
-    ;; until line gaps exist between the detected heading
-    ;; and where the search started
-    ;(if (= (- y-start 1) (count-lines (point-min) (point-max))) (setq y-start -99)) ; stops 1st line non-terminating loop
-    (while (= y-start y-head)
-      (setq y-start (line-number-at-pos))
-      (beginning-of-line) (setq x-start (point))
-      (re-search-forward (concat "^" wik-outline-regexp) nil t)
-      (setq y-head (line-number-at-pos))
-       (setq x-head (point)) (beginning-of-line)
-      (if (= y-start y-head)
-	  (forward-line 1)
-	(beginning-of-line)
-	)
-      (if (= x-start x-head)
-	  (progn
-	    (setq y-start -99) ; cancels loop when there isn't heading text
-	    (goto-char (point-max))
-	    )
-	)
-      ;; (if (= (- y-start 1) (count-lines (point-min) (point-max)))
-      ;; 	  (progn
-      ;; 	    (goto-char (point-max)) ; put in position to add non-exist. heading
-      ;; 	    (setq y-start -99) ; stops last line non-terminating loop
-      ;; 	    )
-      ;; 	)
-      )
-    )
+    (interactive)
+    (outline-next-heading)
   )
 
 (defun wik-previous-heading ()
-  (interactive)
-  (let ( (y1 -99) (y2 -99) (y-start (line-number-at-pos)) (y-head (line-number-at-pos)) (x-start -99) (x-head -99) )
-    ;; go backward to the nearest heading line
-    ;; unless already on a heading line
-    ;; in which case keep searching heading lines backwards
-    ;; until line gaps exist between the detected heading
-    ;; and where the search started
-    (if (= y-start 1) (setq y-start -99)) ; stops 1st line non-terminating loop
-    (while (= y-start y-head)
-      (setq y-start (line-number-at-pos))
-      (end-of-line) (setq x-start (point))
-      (re-search-backward (concat "^" wik-outline-regexp) nil t)
-      (setq y-head (line-number-at-pos))
-      (setq x-head (point))
-      (if (= y-start y-head)
-	  (forward-line -1)
-	)
-      (if (= x-start x-head)
-	  (setq y-start -99)) ; cancels loop when there isn't heading text
-      )
-    ;; walk back 1 line at a time for any additional lines in that heading
-    ;; searching forward each iteration to diff y1 and y2
-    ;; and stopping once they are no longer 1 line apart
-    (setq y2 (line-number-at-pos))
-    (setq y1 (- y2 1))
-    (while (= y2 (+ y1 1))
-      (goto-line y1)    (beginning-of-line)
-      (setq y1 (- (line-number-at-pos) 1))
-      (re-search-forward (concat "^" wik-outline-regexp) nil t)
-      (setq y2 (line-number-at-pos))
-      (if (< y2 2) (setq y1 -99))
-      )
-    (goto-line y2) ; navigate to y2 which is the first line of the heading
-    (beginning-of-line)
-    (message (concat (number-to-string y1) " " (number-to-string y2)))
-    )
+    (interactive)
+    (outline-previous-heading)
   )
 
 (defun wik-outline-entry-toggle ()

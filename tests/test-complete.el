@@ -14,7 +14,7 @@
     (should
         (equal
             (buffer-string)
-            (file-name-concat "./" "tests")
+            (concat "./" "tests")
         )
     )
     (message "BUFFER AFTER:\n%s" (buffer-string))
